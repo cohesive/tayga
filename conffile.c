@@ -19,6 +19,27 @@
 
 struct config *gcfg;
 
+static void config_passthrough_mode(int ln, int arg_count, char **args)
+{
+	if (gcfg->passthrough_mode) {
+		slog(LOG_CRIT, "Error: duplicate passthrough-mode directive on line %d\n", ln);
+		exit(1);
+	}
+	if (arg_count < 1) {
+		slog(LOG_CRIT, "Error: passthrough-mode requires an argument on line %d\n", ln);
+		exit(1);
+	}
+	if (!strcasecmp(args[0], "yes") || !strcasecmp(args[0], "on") || !strcasecmp(args[0], "true")) {
+		gcfg->passthrough_mode = 1;
+	} else if (!strcasecmp(args[0], "no") || !strcasecmp(args[0], "off") || !strcasecmp(args[0], "false")) {
+		gcfg->passthrough_mode = 0;
+	} else {
+		slog(LOG_CRIT, "Error: passthrough-mode must be yes|no on line %d\n", ln);
+		exit(1);
+	}
+}
+
+
 static int parse_prefix(int af, const char *src, void *prefix, int *prefix_len)
 {
 	char *p, *end;
@@ -156,6 +177,8 @@ static void config_ipv6_addr(int ln, int arg_count, char **args)
 }
 
 static void config_prefix(int ln, int arg_count, char **args)
+// RFC8215 support: allow 64:ff9b:1::/48 for private IPv4
+
 {
 	struct map_static *m;
 	struct map6 *m6;
@@ -174,11 +197,19 @@ static void config_prefix(int ln, int arg_count, char **args)
 		exit(1);
 	}
 	if (validate_ip6_addr(&m6->addr) < 0) {
+		// Allow RFC8215 prefix 64:ff9b:1::/48 for private IPv4
+		if (m6->addr.s6_addr32[0] == RFC8215PF_1 && m6->addr.s6_addr32[1] == RFC8215PF_1_SEGMENT && m6->prefix_len == 48) {
+			// Acceptable for RFC1918 mapping
+		} else
 		slog(LOG_CRIT, "Cannot use reserved address %s in prefix "
 				"directive, aborting...\n", args[0]);
 		exit(1);
 	}
 	if (m6->prefix_len != 32 && m6->prefix_len != 40 &&
+		m6->prefix_len != 48 && m6->prefix_len != 56 &&
+		m6->prefix_len != 64 && m6->prefix_len != 96) {
+		// Allow 48 for RFC8215
+	}
 			m6->prefix_len != 48 && m6->prefix_len != 56 &&
 			m6->prefix_len != 64 && m6->prefix_len != 96) {
 		slog(LOG_CRIT, "NAT prefix length must be 32, 40, 48, 56, 64 "

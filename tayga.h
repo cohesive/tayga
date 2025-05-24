@@ -102,6 +102,9 @@ struct icmp {
 } __attribute__ ((__packed__));
 
 #define	WKPF	(htonl(0x0064ff9b))
+#define RFC8215PF_0 (htonl(0x0064ff9b)) /* 64:ff9b::/96 */
+#define RFC8215PF_1 (htonl(0x0064ff9b)) /* 64:ff9b:1::/48 upper 32 bits */
+#define RFC8215PF_1_SEGMENT 0x00010000 /* 64:ff9b:1::/48 segment in s6_addr32[1] */
 
 /* Adjusting the MTU by 20 does not leave room for the IP6 fragmentation
    header, for fragments with the DF bit set.  Follow up with BEHAVE on this.
@@ -193,6 +196,7 @@ struct cache_entry {
 #define CACHE_F_REP_AGEOUT	(1<<3)
 
 struct config {
+	int passthrough_mode; /* 0 = off, 1 = on */
 	char tundev[IFNAMSIZ];
 	char data_dir[512];
 	uint32_t recv_buf_size;
