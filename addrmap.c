@@ -418,6 +418,18 @@ int map_ip4_to_ip6(struct in6_addr *addr6, const struct in_addr *addr4,
 	if (!map4)
 		return -1;
 
+	if (gcfg->passthrough_mode) {
+		// 1:1 passthrough: embed IPv4 into IPv6 using a default or configured prefix
+		// For demo: use 64:ff9b:1::/48 for all
+		memset(addr6, 0, sizeof(struct in6_addr));
+		addr6->s6_addr32[0] = RFC8215PF_1;
+		addr6->s6_addr32[1] = RFC8215PF_1_SEGMENT;
+		addr6->s6_addr32[2] = 0;
+		addr6->s6_addr32[3] = addr4->s_addr;
+		if (c_ptr) *c_ptr = NULL;
+		return 0;
+	}
+
 	switch (map4->type) {
 	case MAP_TYPE_STATIC:
 		s = container_of(map4, struct map_static, map4);
@@ -559,6 +571,15 @@ int map_ip6_to_ip4(struct in_addr *addr4, const struct in6_addr *addr6,
 			map6 = assign_dynamic(addr6);
 		if (!map6)
 			return -1;
+	}
+
+	if (gcfg->passthrough_mode) {
+		// 1:1 passthrough: extract IPv4 from last 32 bits if prefix matches 64:ff9b:1::/48
+		if (addr6->s6_addr32[0] == RFC8215PF_1 && addr6->s6_addr32[1] == RFC8215PF_1_SEGMENT) {
+			addr4->s_addr = addr6->s6_addr32[3];
+			if (c_ptr) *c_ptr = NULL;
+			return 0;
+		}
 	}
 
 	switch (map6->type) {
